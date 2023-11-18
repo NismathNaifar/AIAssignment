@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    #results {
+      position: fixed;
+      top: 50px;
+      left: 10px;
+      color: white;
+    }
+
+    #results span {
+      margin: 5px 5px;
+    }
+
+    video {
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+
+    h1 {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+    }
+
+    button {
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <video autoplay="true" id="videoElement"></video>
+  <button id="vision_button">Analyze</button>
+  <div id='results'></div>
+
+  <script>
+    var video = document.querySelector("#videoElement");
+    if (navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function (stream) {
+                video.srcObject = stream;
+            })
+            .catch(function (err) {
+                console.log("Something went wrong!");
+            });
+    }
+
+    document.querySelector("#vision_button").addEventListener('click', evt => {
+        var scale = 0.25;
+        var canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        canvas.getContext('2d')
+            .drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        var dataUrl = canvas.toDataURL();
+		const API_KEY = 'AIzaSyA6y51NVpADS_ahBNJwsS3f_3EZq9FvLpk';
+		//I have used the feature to perform facial detection and display information about the detected faces, including joy and sorrow likelihood.
+        fetch(`https://vision.googleapis.com/v1/images:annotate?key=${API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                requests: [
+                    {
+                        features: {
+                            type: 'FACE_DETECTION'
+                        },
+                        image: {
+                            content: dataUrl.substring('data:image/png;base64,'.length)
+                        }
+                    }
+                ]
+            })
+        }).then(resp => {
+            return resp.json();
+        }).then(json => {
+            console.log(json);
+            results.innerHTML = '';
+            if (json.responses[0].faceAnnotations && json.responses[0].faceAnnotations.length > 0) {
+                json.responses[0].faceAnnotations.forEach(face => {
+                    let faceInfo = document.createElement('div');
+                    let joyLikelihood = document.createElement('span');
+                    let sorrowLikelihood = document.createElement('span');
+
+                    joyLikelihood.innerText = 'Joy: ' + face.joyLikelihood;
+                    sorrowLikelihood.innerText = 'Sorrow: ' + face.sorrowLikelihood;
+
+                    faceInfo.append(joyLikelihood, sorrowLikelihood);
+                    results.append(faceInfo);
+                });
+            } else {
+                let noFaceMessage = document.createElement('span');
+                noFaceMessage.innerText = 'No faces detected.';
+                results.append(noFaceMessage);
+            }
+        });
+    });
+
+</script>
+</body>
+</html>
